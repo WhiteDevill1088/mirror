@@ -1,0 +1,32 @@
+{
+  "Low Bandwidth": {
+    "bitrate": "2M",
+    "codec": "h264",
+    "resolution": "720p (Downscale)",
+    "fps": "30 FPS",
+    "audio": true
+  },
+  "Balanced": {
+    "bitrate": "8M",
+    "codec": "h265",
+    "resolution": "Default (Native)",
+    "fps": "Default",
+    "audio": true
+  },
+  "Recording": {
+    "bitrate": "16M",
+    "codec": "h265",
+    "resolution": "1080p (Downscale)",
+    "fps": "60 FPS",
+    "audio": true,
+    "record": true
+  },
+  "Gaming": {
+    "bitrate": "16M",
+    "codec": "h265",
+    "resolution": "1080p (Downscale)",
+    "fps": "60 FPS",
+    "audio": false,
+    "screen_off": true
+  }
+}
