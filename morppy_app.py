@@ -10,11 +10,11 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor, QPixmap
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QTabWidget, QLabel, QPushButton, QLineEdit, QComboBox, QCheckBox,
+    QLabel, QPushButton, QLineEdit, QComboBox, QCheckBox,
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView, QTextEdit,
     QSpinBox, QSystemTrayIcon, QMenu, QAction, QFileDialog, QMessageBox,
     QFrame, QGridLayout, QFormLayout, QScrollArea, QProgressBar, QSplashScreen, QInputDialog,
-    QDialog
+    QDialog, QStackedWidget, QListWidget, QListWidgetItem
 )
 
 from config import (
@@ -30,186 +30,144 @@ from ios_engine import IOSManager
 # DARK GLASSMORPHISM STYLESHEET (KEEPING THE ULTRA-PREMIUM COLOR SCHEME)
 # -----------------------------------------------------------------------------
 GLASS_DARK_QSS = """
-QMainWindow, QDialog {
-    background-color: #12181b;
-    color: #f8fafc;
-}
-QWidget {
-    background-color: #12181b;
+QMainWindow, QDialog, QWidget {
+    background-color: #111827;
     color: #f8fafc;
     font-family: 'Segoe UI', Arial, sans-serif;
     font-size: 13px;
 }
-
-QFrame#cardFrame {
-    background-color: rgba(26, 35, 39, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 14px;
-    padding: 14px;
-}
 QFrame#headerFrame {
-    background-color: rgba(18, 24, 27, 0.95);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 10px 20px;
+    background-color: #111827;
+    border-bottom: 1px solid #263244;
+}
+QFrame#cardFrame {
+    background-color: #182230;
+    border: 1px solid #263244;
+    border-radius: 12px;
+}
+QFrame#toolbarFrame {
+    background-color: #111827;
+    border: 1px solid #263244;
+    border-radius: 8px;
 }
 
-QTabWidget::pane {
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background-color: #12181b;
-    border-radius: 10px;
+QListWidget#navRail {
+    background-color: #0d1521;
+    border: none;
+    border-right: 1px solid #263244;
+    outline: none;
+    padding: 12px 8px;
 }
-QTabBar::tab {
-    background-color: rgba(26, 35, 39, 0.7);
+QListWidget#navRail::item {
     color: #94a3b8;
-    padding: 10px 20px;
-    margin-right: 4px;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    font-weight: 600;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 2px 0;
 }
-QTabBar::tab:selected {
-    background-color: rgba(56, 189, 248, 0.2);
+QListWidget#navRail::item:selected {
+    background-color: #172a3a;
     color: #38bdf8;
-    border-bottom: 2px solid #38bdf8;
 }
-QTabBar::tab:hover:!selected {
-    background-color: rgba(255, 255, 255, 0.05);
-    color: #f8fafc;
+QListWidget#navRail::item:hover:!selected {
+    background-color: #182230;
+    color: #e2e8f0;
 }
 
 QGroupBox {
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid #263244;
     border-radius: 10px;
     margin-top: 12px;
     padding-top: 16px;
-    font-weight: bold;
-    color: #38bdf8;
-    background-color: rgba(26, 35, 39, 0.5);
+    font-weight: 600;
+    color: #cbd5e1;
+    background-color: #182230;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top left;
+    left: 12px;
     padding: 0 8px;
 }
 
 QPushButton {
-    background-color: rgba(51, 65, 85, 0.6);
+    background-color: #263244;
     color: #f8fafc;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid #334155;
     border-radius: 8px;
-    padding: 8px 16px;
+    padding: 8px 14px;
+    min-height: 22px;
     font-weight: 600;
 }
-QPushButton:hover {
-    background-color: rgba(71, 85, 105, 0.8);
-    border-color: rgba(56, 189, 248, 0.5);
-}
-QPushButton:pressed {
-    background-color: rgba(30, 41, 59, 0.9);
-}
-
-QPushButton#successBtn {
-    background-color: rgba(16, 185, 129, 0.25);
-    color: #34d399;
-    border: 1px solid rgba(16, 185, 129, 0.5);
-}
-QPushButton#successBtn:hover {
-    background-color: rgba(16, 185, 129, 0.4);
-    border-color: #10b981;
-}
-
-QPushButton#gearBtn {
-    background-color: rgba(56, 189, 248, 0.2);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    font-size: 14px;
-    padding: 8px 12px;
-    border-radius: 8px;
-}
-QPushButton#gearBtn:hover {
-    background-color: rgba(56, 189, 248, 0.35);
-    border-color: #38bdf8;
-}
-
-QPushButton#dangerBtn {
-    background-color: rgba(239, 68, 68, 0.2);
-    color: #f87171;
-    border: 1px solid rgba(239, 68, 68, 0.4);
-}
-QPushButton#dangerBtn:hover {
-    background-color: rgba(239, 68, 68, 0.35);
-}
-
-QPushButton#purpleBtn {
-    background-color: rgba(139, 92, 246, 0.25);
-    color: #c084fc;
-    border: 1px solid rgba(139, 92, 246, 0.5);
-}
-QPushButton#purpleBtn:hover {
-    background-color: rgba(139, 92, 246, 0.4);
-}
-
+QPushButton:hover { background-color: #334155; border-color: #475569; }
+QPushButton:pressed { background-color: #1e293b; }
+QPushButton:focus { border: 2px solid #38bdf8; }
+QPushButton:disabled { color: #64748b; background-color: #1e293b; border-color: #263244; }
+QPushButton#successBtn { background-color: #087f5b; color: #ffffff; border-color: #10b981; }
+QPushButton#successBtn:hover { background-color: #099268; }
+QPushButton#dangerBtn { background-color: #8f2d3b; color: #ffffff; border-color: #b94a5a; }
+QPushButton#dangerBtn:hover { background-color: #a83b49; }
+QPushButton#purpleBtn { background-color: #6550a3; color: #ffffff; border-color: #8065c6; }
+QPushButton#purpleBtn:hover { background-color: #735bb5; }
 QPushButton#toolBtn {
-    background-color: rgba(30, 41, 59, 0.8);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.3);
+    background-color: #182230;
+    color: #cbd5e1;
+    border: 1px solid #263244;
     border-radius: 6px;
-    padding: 6px 12px;
+    padding: 6px 10px;
+    min-height: 20px;
     font-size: 12px;
-    font-weight: bold;
 }
-QPushButton#toolBtn:hover {
-    background-color: rgba(56, 189, 248, 0.25);
-    border-color: #38bdf8;
-}
+QPushButton#toolBtn:hover { color: #38bdf8; border-color: #38bdf8; }
 
 QLineEdit, QComboBox, QSpinBox {
-    background-color: rgba(15, 23, 42, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background-color: #111827;
+    border: 1px solid #334155;
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 8px 10px;
+    min-height: 22px;
     color: #f8fafc;
 }
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-    border: 1px solid #38bdf8;
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border: 2px solid #38bdf8; }
+QComboBox::drop-down { border: none; width: 24px; }
+QComboBox QAbstractItemView {
+    background-color: #182230;
+    selection-background-color: #172a3a;
+    selection-color: #38bdf8;
+    border: 1px solid #334155;
 }
 
-QCheckBox {
-    spacing: 8px;
-}
+QCheckBox { spacing: 8px; color: #e2e8f0; }
 QCheckBox::indicator {
-    width: 18px;
-    height: 18px;
-    border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background-color: rgba(15, 23, 42, 0.7);
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    border: 1px solid #475569;
+    background-color: #111827;
 }
-QCheckBox::indicator:checked {
-    background-color: #38bdf8;
-    border-color: #38bdf8;
-}
+QCheckBox::indicator:checked { background-color: #38bdf8; border-color: #38bdf8; }
 
 QTableWidget {
-    background-color: rgba(26, 35, 39, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    gridline-color: rgba(255, 255, 255, 0.06);
+    background-color: #182230;
+    alternate-background-color: #16202d;
+    border: 1px solid #263244;
     border-radius: 8px;
+    gridline-color: #263244;
 }
 QHeaderView::section {
-    background-color: #12181b;
-    color: #38bdf8;
+    background-color: #111827;
+    color: #94a3b8;
     padding: 8px;
     border: none;
-    font-weight: bold;
+    border-bottom: 1px solid #263244;
+    font-weight: 600;
 }
-
 QTextEdit {
-    background-color: rgba(26, 35, 39, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: #0d1521;
+    border: 1px solid #263244;
     border-radius: 8px;
     color: #e2e8f0;
     font-family: 'Consolas', 'Courier New', monospace;
 }
+QScrollArea { border: none; background: transparent; }
 """
 
 
@@ -238,7 +196,7 @@ class MorppySplashScreen(QSplashScreen):
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(24, 24, 24, 24)
 
-        title = QLabel("🔗📱 MORPPY SUITE", card)
+        title = QLabel("MORPPY SUITE", card)
         title.setFont(QFont("Segoe UI", 20, QFont.Bold))
         title.setStyleSheet("color: #38bdf8; border: none;")
         title.setAlignment(Qt.AlignCenter)
@@ -278,7 +236,7 @@ class MorppySplashScreen(QSplashScreen):
         """)
         card_layout.addWidget(self.progress)
 
-        self.status_lbl = QLabel("⚡ Initializing Morppy Core Engines...", card)
+        self.status_lbl = QLabel("Initializing Morppy Core Engines...", card)
         self.status_lbl.setFont(QFont("Segoe UI", 9))
         self.status_lbl.setStyleSheet("color: #cbd5e1; border: none;")
         self.status_lbl.setAlignment(Qt.AlignCenter)
@@ -302,9 +260,9 @@ class DisplaySettingsDialog(QDialog):
         self.serial = serial
         self.is_launch = is_launch
 
-        title = f"📱 Configure & Launch Mirroring ({serial})" if serial else "🖥 Display & Stream Settings"
+        title = f"Configure & Launch Mirroring ({serial})" if serial else "Display & Stream Settings"
         self.setWindowTitle(title)
-        self.setFixedSize(650, 550)
+        self.setMinimumSize(620, 520)
         self.setStyleSheet("""
             QDialog {
                 background-color: #12181b;
@@ -359,7 +317,7 @@ class DisplaySettingsDialog(QDialog):
         layout.setContentsMargins(26, 22, 26, 22)
         layout.setSpacing(16)
 
-        header_lbl = QLabel(f"⚙ Configure Session Display Settings ({serial})" if serial else "🖥 Display & Stream Settings")
+        header_lbl = QLabel(f"Configure Session Display Settings ({serial})" if serial else "Display & Stream Settings")
         header_lbl.setFont(QFont("Segoe UI", 16, QFont.Bold))
         header_lbl.setStyleSheet("color: #38bdf8; margin-bottom: 2px; background: transparent;")
         layout.addWidget(header_lbl)
@@ -373,7 +331,7 @@ class DisplaySettingsDialog(QDialog):
         res_form.setVerticalSpacing(16)
         res_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        sec1_title = QLabel("🖥 Mirror Engine & Stream Resolution")
+        sec1_title = QLabel("Mirror Engine & Stream Resolution")
         sec1_title.setStyleSheet("color: #38bdf8; font-size: 15px; font-weight: bold; margin-bottom: 6px; background: transparent;")
         res_form.addRow(sec1_title)
 
@@ -504,9 +462,9 @@ class RecordingSettingsDialog(QDialog):
         self.main_win = main_win
         self.serial = serial
 
-        title = f"🎥 Screen Recording Settings ({serial})" if serial else "🎥 Screen Recording Settings"
+        title = f"Screen Recording Settings ({serial})" if serial else "Screen Recording Settings"
         self.setWindowTitle(title)
-        self.setFixedSize(680, 510)
+        self.setMinimumSize(640, 500)
         self.setStyleSheet("""
             QDialog {
                 background-color: #12181b;
@@ -561,7 +519,7 @@ class RecordingSettingsDialog(QDialog):
         layout.setContentsMargins(28, 22, 28, 22)
         layout.setSpacing(16)
 
-        header_lbl = QLabel(f"🎥 Screen Recording Settings ({serial})" if serial else "🎥 Screen Recording Settings")
+        header_lbl = QLabel(f"Screen Recording Settings ({serial})" if serial else "Screen Recording Settings")
         header_lbl.setFont(QFont("Segoe UI", 16, QFont.Bold))
         header_lbl.setStyleSheet("color: #fb923c; margin-bottom: 2px; background: transparent;")
         layout.addWidget(header_lbl)
@@ -575,7 +533,7 @@ class RecordingSettingsDialog(QDialog):
         rec_form.setVerticalSpacing(16)
         rec_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        sec1_title = QLabel("⚙️ Hardware Encoder & Video Format Setup")
+        sec1_title = QLabel("Hardware Encoder & Video Format")
         sec1_title.setStyleSheet("color: #fb923c; font-size: 15px; font-weight: bold; margin-bottom: 6px; background: transparent;")
         rec_form.addRow(sec1_title)
 
@@ -666,7 +624,7 @@ class RecordingSettingsDialog(QDialog):
         btn_cancel.clicked.connect(self.reject)
         btn_box.addWidget(btn_cancel)
 
-        btn_start = QPushButton("🔴 Start Recording")
+        btn_start = QPushButton("Start Recording")
         btn_start.setObjectName("dangerBtn")
         btn_start.setStyleSheet("""
             QPushButton#dangerBtn {
@@ -819,13 +777,13 @@ class MorppyMainWindow(QMainWindow):
         header_layout = QHBoxLayout(header_frame)
         header_layout.setContentsMargins(20, 12, 20, 12)
 
-        logo_lbl = QLabel("📱 MORPPY MOBILE MIRROR SUITE")
+        logo_lbl = QLabel("Morppy")
         logo_lbl.setFont(QFont("Segoe UI", 16, QFont.Bold))
         logo_lbl.setStyleSheet("color: #38bdf8;")
 
-        self.status_badge = QLabel("🟢 System Ready")
+        self.status_badge = QLabel("System Ready")
         self.status_badge.setStyleSheet("""
-            background-color: rgba(16, 185, 129, 0.15);
+            background-color: rgba(16, 185, 129, 0.12);
             color: #34d399;
             font-weight: bold;
             padding: 6px 14px;
@@ -833,33 +791,53 @@ class MorppyMainWindow(QMainWindow):
             border-radius: 14px;
         """)
 
-        btn_refresh = QPushButton("🔄 Refresh ADB")
+        btn_refresh = QPushButton("Refresh Devices")
         btn_refresh.setCursor(QCursor(Qt.PointingHandCursor))
         btn_refresh.clicked.connect(self.start_device_scan)
 
-        btn_reset_adb = QPushButton("⚡ Reset ADB")
+        btn_reset_adb = QPushButton("Reset ADB")
         btn_reset_adb.setObjectName("dangerBtn")
         btn_reset_adb.setCursor(QCursor(Qt.PointingHandCursor))
         btn_reset_adb.clicked.connect(self.reset_adb_server)
 
         header_layout.addWidget(logo_lbl)
         header_layout.addStretch()
+        header_layout.addWidget(QLabel("Preset"))
+        self.quick_preset = QComboBox()
+        self.quick_preset.addItems(list(self.presets.keys()))
+        self.quick_preset.currentTextChanged.connect(self.apply_quick_preset)
+        header_layout.addWidget(self.quick_preset)
         header_layout.addWidget(self.status_badge)
         header_layout.addWidget(btn_refresh)
         header_layout.addWidget(btn_reset_adb)
 
         main_layout.addWidget(header_frame)
 
-        # Main Tab Widget
-        self.tab_widget = QTabWidget()
-        main_layout.addWidget(self.tab_widget, 1)
+        content_layout = QHBoxLayout()
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
 
-        # Build Tabs (Display Settings moved to Gear icon next to Launch Mirror)
+        self.nav_rail = QListWidget()
+        self.nav_rail.setObjectName("navRail")
+        self.nav_rail.setFixedWidth(190)
+        for label in ("Devices", "Global Settings", "Presets & History", "iOS AirPlay", "Logs"):
+            item = QListWidgetItem(label)
+            item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            self.nav_rail.addItem(item)
+
+        self.content_pages = QStackedWidget()
+        self.nav_rail.currentRowChanged.connect(self.content_pages.setCurrentIndex)
+
+        content_layout.addWidget(self.nav_rail)
+        content_layout.addWidget(self.content_pages, 1)
+        main_layout.addLayout(content_layout, 1)
+
         self.build_devices_tab()
         self.build_global_settings_tab()
         self.build_presets_history_tab()
         self.build_ios_tab()
         self.build_logs_tab()
+        self.nav_rail.setCurrentRow(0)
 
     # -------------------------------------------------------------------------
     # TAB 1: DEVICES & CONNECTION
@@ -884,6 +862,14 @@ class MorppyMainWindow(QMainWindow):
 
         layout.addWidget(connect_box)
 
+        search_layout = QHBoxLayout()
+        self.device_search = QLineEdit()
+        self.device_search.setPlaceholderText("Search by model or serial")
+        self.device_search.textChanged.connect(self.render_device_cards)
+        search_layout.addWidget(self.device_search)
+        search_layout.addStretch()
+        layout.addLayout(search_layout)
+
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
@@ -897,7 +883,7 @@ class MorppyMainWindow(QMainWindow):
         scroll_area.setWidget(self.devices_container)
         layout.addWidget(scroll_area, 1)
 
-        self.tab_widget.addTab(tab, "📱 Devices")
+        self.content_pages.addWidget(tab)
 
     # -------------------------------------------------------------------------
     # TAB 2: GLOBAL & AUDIO SETTINGS
@@ -1009,7 +995,7 @@ class MorppyMainWindow(QMainWindow):
 
         layout.addStretch()
 
-        self.tab_widget.addTab(tab, "🔊 Global_Audio")
+        self.content_pages.addWidget(tab)
 
     # -------------------------------------------------------------------------
     # TAB 4: PRESETS & HISTORY
@@ -1048,16 +1034,22 @@ class MorppyMainWindow(QMainWindow):
         group_history = QGroupBox("Recent Session History")
         hist_layout = QVBoxLayout(group_history)
 
+        history_search = QLineEdit()
+        history_search.setPlaceholderText("Search session history")
+        history_search.textChanged.connect(self.filter_history_table)
+        hist_layout.addWidget(history_search)
+
         self.table_history = QTableWidget()
         self.table_history.setColumnCount(5)
         self.table_history.setHorizontalHeaderLabels(["Timestamp", "Device Serial", "Bitrate", "Resolution", "Framerate"])
         self.table_history.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_history.setSortingEnabled(True)
         hist_layout.addWidget(self.table_history)
 
         layout.addWidget(group_history, 1)
         self.update_history_table()
 
-        self.tab_widget.addTab(tab, "🎛 Presets_History")
+        self.content_pages.addWidget(tab)
 
     # -------------------------------------------------------------------------
     # TAB 5: IOS AIRPLAY
@@ -1079,7 +1071,7 @@ class MorppyMainWindow(QMainWindow):
         ios_layout.addWidget(info_lbl)
 
         btn_layout = QHBoxLayout()
-        self.btn_ios_toggle = QPushButton("📡 Launch AirPlay Mirror Receiver")
+        self.btn_ios_toggle = QPushButton("Launch AirPlay Mirror Receiver")
         self.btn_ios_toggle.setObjectName("purpleBtn")
         self.btn_ios_toggle.clicked.connect(self.toggle_airplay_server)
         btn_layout.addWidget(self.btn_ios_toggle)
@@ -1097,7 +1089,7 @@ class MorppyMainWindow(QMainWindow):
         layout.addWidget(group_ios)
         layout.addStretch()
 
-        self.tab_widget.addTab(tab, "🍏 iOS AirPlay")
+        self.content_pages.addWidget(tab)
 
     # -------------------------------------------------------------------------
     # TAB 6: LOGS CONSOLE
@@ -1115,7 +1107,7 @@ class MorppyMainWindow(QMainWindow):
         btn_clear_logs.clicked.connect(self.log_console.clear)
         layout.addWidget(btn_clear_logs)
 
-        self.tab_widget.addTab(tab, "📄 Logs")
+        self.content_pages.addWidget(tab)
 
     # -------------------------------------------------------------------------
     # SYSTEM TRAY SETUP
@@ -1159,39 +1151,60 @@ class MorppyMainWindow(QMainWindow):
                 child.widget().deleteLater()
 
         if not self.known_devices:
-            lbl_empty = QLabel("No Android devices connected via USB or Wireless ADB.\nPlug in a device or enter IP address above to connect.")
+            lbl_empty = QLabel("No Android devices found\nConnect a device by USB or enter a wireless address above.")
             lbl_empty.setAlignment(Qt.AlignCenter)
             lbl_empty.setStyleSheet("color: #64748b; font-size: 14px; padding: 40px;")
             self.devices_layout.insertWidget(0, lbl_empty)
             return
 
+        query = self.device_search.text().strip().lower() if hasattr(self, "device_search") else ""
+        visible_devices = []
         for serial in self.known_devices:
+            info = AndroidManager.get_device_info(serial)
+            if query and query not in f"{serial} {info.get('model', '')}".lower():
+                continue
+            visible_devices.append((serial, info))
+
+        if not visible_devices:
+            lbl_empty = QLabel("No devices match your search.")
+            lbl_empty.setAlignment(Qt.AlignCenter)
+            lbl_empty.setStyleSheet("color: #64748b; font-size: 14px; padding: 40px;")
+            self.devices_layout.insertWidget(0, lbl_empty)
+            return
+
+        for serial, info in visible_devices:
             card = QFrame()
             card.setObjectName("cardFrame")
             card_layout = QVBoxLayout(card)
             card_layout.setSpacing(12)
 
-            info = AndroidManager.get_device_info(serial)
-
             # Top row: Serial & Model + Battery
             top_row = QHBoxLayout()
-            lbl_title = QLabel(f"📱 {info['model']} ({serial})")
+            lbl_title = QLabel(info["model"])
             lbl_title.setFont(QFont("Segoe UI", 13, QFont.Bold))
             lbl_title.setStyleSheet("color: #38bdf8;")
 
-            lbl_battery = QLabel(f"🔋 {info['battery']}")
+            lbl_serial = QLabel(serial)
+            lbl_serial.setStyleSheet("color: #94a3b8;")
+
+            lbl_connection = QLabel("USB" if ":" not in serial else "Wireless")
+            lbl_connection.setStyleSheet("color: #34d399; border: 1px solid rgba(16,185,129,.35); border-radius: 10px; padding: 4px 8px;")
+
+            lbl_battery = QLabel(info["battery"])
             lbl_battery.setStyleSheet("color: #34d399; font-weight: bold;")
 
             top_row.addWidget(lbl_title)
+            top_row.addWidget(lbl_serial)
             top_row.addStretch()
+            top_row.addWidget(lbl_connection)
             top_row.addWidget(lbl_battery)
             card_layout.addLayout(top_row)
 
             # Live Telemetry Stats Row
             telemetry_row = QHBoxLayout()
-            lbl_cpu = QLabel("⚙ CPU: 12%")
+            lbl_cpu = QLabel("CPU: --")
             lbl_cpu.setObjectName(f"cpu_{serial}")
-            lbl_ram = QLabel("💾 RAM: 4.8GB / 8GB")
+            lbl_ram = QLabel("RAM: --")
             lbl_ram.setObjectName(f"ram_{serial}")
 
             telemetry_row.addWidget(lbl_cpu)
@@ -1202,27 +1215,27 @@ class MorppyMainWindow(QMainWindow):
             # Primary Session Actions Row
             btn_row = QHBoxLayout()
 
-            btn_mirror = QPushButton("🚀 Launch Mirror")
+            btn_mirror = QPushButton("Launch Mirror")
             btn_mirror.setObjectName("successBtn")
             btn_mirror.clicked.connect(lambda _, s=serial: self.launch_mirror_session(s))
 
-            btn_reset_res = QPushButton("🖥 Reset Screen")
+            btn_reset_res = QPushButton("Reset Screen")
             btn_reset_res.setToolTip("Resets phone screen resolution & density to default native mode.")
             btn_reset_res.clicked.connect(lambda _, s=serial: (AndroidManager.reset_hardware_resolution(s), self.log_message(f"Reset resolution for {s}.")))
 
-            btn_screen_off = QPushButton("🌙 Screen Off")
+            btn_screen_off = QPushButton("Screen Off")
             btn_screen_off.setToolTip("Turns OFF physical phone display while keeping PC mirror stream 100% active to save battery & protect screen.")
             btn_screen_off.clicked.connect(lambda _, s=serial: (AndroidManager.turn_off_screen(s), self.log_message(f"Turned OFF physical display for {s}.")))
 
-            btn_lock = QPushButton("🔒 Lock")
+            btn_lock = QPushButton("Lock")
             btn_lock.clicked.connect(lambda _, s=serial: AndroidManager.lock_device(s))
 
-            btn_reboot = QPushButton("🔄 Reboot")
+            btn_reboot = QPushButton("Reboot")
             btn_reboot.setObjectName("dangerBtn")
-            btn_reboot.clicked.connect(lambda _, s=serial: AndroidManager.reboot_device(s))
+            btn_reboot.clicked.connect(lambda _, s=serial: self.confirm_reboot(s))
 
             is_rec = self.recording_sessions.get(serial, False)
-            btn_rec = QPushButton("🔴 Recording..." if is_rec else "🔴 Start Rec")
+            btn_rec = QPushButton("Recording" if is_rec else "Start Recording")
             btn_rec.setObjectName(f"rec_btn_{serial}")
             if is_rec:
                 btn_rec.setStyleSheet("""
@@ -1253,42 +1266,44 @@ class MorppyMainWindow(QMainWindow):
 
             # Screen Control Quick Toolbar
             toolbar_box = QFrame()
-            toolbar_box.setStyleSheet("background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 4px;")
+            toolbar_box.setObjectName("toolbarFrame")
             tb_layout = QHBoxLayout(toolbar_box)
             tb_layout.setContentsMargins(6, 4, 6, 4)
             tb_layout.setSpacing(6)
 
-            btn_pow = QPushButton("⚡ Power")
+            btn_pow = QPushButton("Power")
             btn_pow.setObjectName("toolBtn")
             btn_pow.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 26))
 
-            btn_volp = QPushButton("▲ Vol+")
+            btn_volp = QPushButton("Vol+")
             btn_volp.setObjectName("toolBtn")
             btn_volp.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 24))
 
-            btn_volm = QPushButton("▼ Vol-")
+            btn_volm = QPushButton("Vol-")
             btn_volm.setObjectName("toolBtn")
             btn_volm.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 25))
 
-            btn_back = QPushButton("◀ Back")
+            btn_back = QPushButton("Back")
             btn_back.setObjectName("toolBtn")
             btn_back.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 4))
 
-            btn_home = QPushButton("🏠 Home")
+            btn_home = QPushButton("Home")
             btn_home.setObjectName("toolBtn")
             btn_home.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 3))
 
-            btn_recents = QPushButton("▢ Recents")
+            btn_recents = QPushButton("Recents")
             btn_recents.setObjectName("toolBtn")
             btn_recents.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 187))
 
-            btn_clip = QPushButton("📋 Clip")
+            btn_clip = QPushButton("Clipboard")
             btn_clip.setObjectName("toolBtn")
             btn_clip.clicked.connect(lambda _, s=serial: self.prompt_inject_text(s))
 
-            btn_snap = QPushButton("📷 Snap")
+            btn_snap = QPushButton("Screenshot")
             btn_snap.setObjectName("toolBtn")
-            btn_snap.clicked.connect(lambda _, s=serial: AndroidManager.take_screenshot(s, self.txt_rec_path.text()))
+            btn_snap.clicked.connect(lambda _, s=serial: AndroidManager.take_screenshot(
+                s, self.recording_settings.get("path", SCRCPY_DIRECTORY)
+            ))
 
             tb_layout.addWidget(btn_pow)
             tb_layout.addWidget(btn_volp)
@@ -1313,12 +1328,31 @@ class MorppyMainWindow(QMainWindow):
     # TELEMETRY & ACTIONS
     # -------------------------------------------------------------------------
     def start_device_scan(self):
+        self.status_badge.setText("Scanning Devices")
+        self.status_badge.setStyleSheet("""
+            background-color: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+            font-weight: bold;
+            padding: 6px 14px;
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            border-radius: 14px;
+        """)
         self.scanner_thread = DeviceScannerWorker()
         self.scanner_thread.devices_signal.connect(self.on_devices_scanned)
         self.scanner_thread.start()
 
     def on_devices_scanned(self, devices):
         self.known_devices = devices
+        count = len(devices)
+        self.status_badge.setText(f"{count} Device{'s' if count != 1 else ''} Connected")
+        self.status_badge.setStyleSheet("""
+            background-color: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            font-weight: bold;
+            padding: 6px 14px;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 14px;
+        """)
         self.render_device_cards()
 
     def update_telemetry(self):
@@ -1333,8 +1367,8 @@ class MorppyMainWindow(QMainWindow):
         cpu_lbl = self.findChild(QLabel, f"cpu_{serial}")
         ram_lbl = self.findChild(QLabel, f"ram_{serial}")
 
-        if cpu_lbl: cpu_lbl.setText(f"⚙ CPU: {telemetry.get('cpu', '12%')}")
-        if ram_lbl: ram_lbl.setText(f"💾 RAM: {telemetry.get('ram', '4.8GB / 8GB')}")
+        if cpu_lbl: cpu_lbl.setText(f"CPU: {telemetry.get('cpu', '--')}")
+        if ram_lbl: ram_lbl.setText(f"RAM: {telemetry.get('ram', '--')}")
 
     def animate_recording_blink(self):
         self.rec_blink_state = not self.rec_blink_state
@@ -1343,8 +1377,7 @@ class MorppyMainWindow(QMainWindow):
                 btn = self.findChild(QPushButton, f"rec_btn_{serial}")
                 if btn:
                     try:
-                        dot = "🔴" if self.rec_blink_state else "⭕"
-                        btn.setText(f"{dot} Recording...")
+                        btn.setText("Recording" if self.rec_blink_state else "Recording...")
                     except RuntimeError:
                         pass
 
@@ -1377,13 +1410,22 @@ class MorppyMainWindow(QMainWindow):
                                 border-color: #fb923c;
                             }
                         """)
-                        live_btn.setText("🔴 Recording...")
+                        live_btn.setText("Recording")
                     except RuntimeError:
                         pass
                 self.log_message(f"Started screen recording on {serial} ({fmt.upper()}). Target path: {res}")
             else:
                 QMessageBox.critical(self, "Recording Failed", f"Could not start screen recording on {serial}.")
         else:
+            reply = QMessageBox.question(
+                self,
+                "Stop Recording",
+                f"Stop screen recording on {serial}?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply != QMessageBox.Yes:
+                return
             self.recording_sessions[serial] = False
             if live_btn:
                 try:
@@ -1399,13 +1441,13 @@ class MorppyMainWindow(QMainWindow):
                             border-color: #f87171;
                         }
                     """)
-                    live_btn.setText("🔴 Start Rec")
+                    live_btn.setText("Start Recording")
                 except RuntimeError:
                     pass
             save_dir = self.recording_settings.get("path", SCRCPY_DIRECTORY)
             saved_path = AndroidManager.stop_screenrecord(serial, local_folder=save_dir)
             if isinstance(saved_path, str) and os.path.exists(saved_path):
-                self.log_message(f"🎥 Screen recording saved successfully to: {saved_path}")
+                self.log_message(f"Screen recording saved successfully to: {saved_path}")
                 try:
                     os.startfile(os.path.dirname(saved_path))
                 except Exception:
@@ -1427,10 +1469,30 @@ class MorppyMainWindow(QMainWindow):
             QMessageBox.critical(self, "Connection Failed", f"Could not connect to {ip}:\n{res}")
 
     def reset_adb_server(self):
+        reply = QMessageBox.question(
+            self,
+            "Reset ADB Server",
+            "Reset the Android Debug Bridge server and reconnect devices?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply != QMessageBox.Yes:
+            return
         self.log_message("Resetting ADB server...")
         if AndroidManager.reset_adb():
             self.log_message("ADB server restarted successfully.")
             self.start_device_scan()
+
+    def confirm_reboot(self, serial):
+        reply = QMessageBox.question(
+            self,
+            "Reboot Device",
+            f"Reboot the device {serial}? Unsaved work may be lost.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            AndroidManager.reboot_device(serial)
 
     def launch_mirror_session(self, serial):
         dialog = DisplaySettingsDialog(self, serial=serial, is_launch=True)
@@ -1454,12 +1516,12 @@ class MorppyMainWindow(QMainWindow):
     def toggle_airplay_server(self):
         if self.ios_manager.process and self.ios_manager.process.poll() is None:
             self.ios_manager.stop_server()
-            self.btn_ios_toggle.setText("📡 Launch AirPlay Mirror Receiver")
+            self.btn_ios_toggle.setText("Launch AirPlay Mirror Receiver")
             self.ios_status_lbl.setText("AirPlay Status: Stopped")
             self.ios_status_lbl.setStyleSheet("color: #f43f5e; font-weight: bold;")
         else:
             if self.ios_manager.start_server():
-                self.btn_ios_toggle.setText("⏹ Stop AirPlay Receiver")
+                self.btn_ios_toggle.setText("Stop AirPlay Receiver")
                 self.ios_status_lbl.setText("AirPlay Status: Running ('Morppy AirPlay Receiver')")
                 self.ios_status_lbl.setStyleSheet("color: #34d399; font-weight: bold;")
 
@@ -1525,11 +1587,25 @@ class MorppyMainWindow(QMainWindow):
             p = self.presets[preset_name]
             if "bitrate" in p: self.combo_bitrate.setCurrentText(p["bitrate"])
             if "codec" in p: self.combo_codec.setCurrentText(p["codec"])
-            if "resolution" in p: self.combo_resolution.setCurrentText(p["resolution"])
+            if "resolution" in p:
+                self.display_settings["resolution"] = p["resolution"]
             if "audio" in p: self.chk_audio.setChecked(p["audio"])
-            if "record" in p: self.chk_record_on_start.setChecked(p["record"])
-            if "screen_off" in p: self.chk_screen_off.setChecked(p["screen_off"])
+            if "record" in p: self.recording_settings["auto_record"] = p["record"]
+            if "screen_off" in p: self.display_settings["screen_off"] = p["screen_off"]
             self.log_message(f"Applied preset: {preset_name}")
+
+    def apply_quick_preset(self, preset_name):
+        if preset_name not in self.presets:
+            return
+        preset = self.presets[preset_name]
+        if hasattr(self, "combo_bitrate") and "bitrate" in preset:
+            self.combo_bitrate.setCurrentText(preset["bitrate"])
+        if hasattr(self, "combo_codec") and "codec" in preset:
+            self.combo_codec.setCurrentText(preset["codec"])
+        if "resolution" in preset:
+            self.display_settings["resolution"] = preset["resolution"]
+        if hasattr(self, "chk_audio") and "audio" in preset:
+            self.chk_audio.setChecked(preset["audio"])
 
     def save_current_as_preset(self):
         name, ok = QInputDialog.getText(self, "Save Preset", "Enter preset name:")
@@ -1598,6 +1674,17 @@ class MorppyMainWindow(QMainWindow):
             self.table_history.setItem(row, 1, QTableWidgetItem(entry.get("serial", "")))
             self.table_history.setItem(row, 2, QTableWidgetItem(entry.get("bitrate", "")))
             self.table_history.setItem(row, 3, QTableWidgetItem(entry.get("resolution", "")))
+            self.table_history.setItem(row, 4, QTableWidgetItem(entry.get("framerate", "60 fps")))
+
+    def filter_history_table(self, text):
+        text = text.strip().lower()
+        for row in range(self.table_history.rowCount()):
+            match = any(
+                text in (self.table_history.item(row, column).text().lower()
+                         if self.table_history.item(row, column) else "")
+                for column in range(self.table_history.columnCount())
+            )
+            self.table_history.setRowHidden(row, bool(text) and not match)
 
     def browse_record_directory(self):
         folder = QFileDialog.getExistingDirectory(self, "Select Recording Directory")
@@ -1631,10 +1718,10 @@ if __name__ == "__main__":
     splash.show()
 
     steps = [
-        (25, "⚡ Initializing Morppy Core Engines..."),
-        (55, "🔌 Verifying ADB & Scrcpy Drivers..."),
-        (85, "🍏 Loading UxPlay AirPlay Receiver Services..."),
-        (100, "📱 Ready to launch Morppy!")
+        (25, "Initializing Morppy Core Engines..."),
+        (55, "Verifying ADB & Scrcpy Drivers..."),
+        (85, "Loading UxPlay AirPlay Receiver Services..."),
+        (100, "Ready to launch Morppy")
     ]
 
     for val, msg in steps:

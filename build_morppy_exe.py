@@ -1,89 +1,70 @@
-import os
-import sys
-import shutil
 import subprocess
+import sys
+from pathlib import Path
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-SCRCPY_BIN_DIR = os.path.join(PROJECT_ROOT, "scrcpy-win64-v4.0")
-UXPLAY_BIN_DIR = os.path.join(PROJECT_ROOT, "uxplay-windows")
-ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+SCRCPY_DIR = PROJECT_ROOT / "scrcpy-win64-v4.0"
+QT_SCRCPY_DIR = PROJECT_ROOT / "QtScrcpy"
+UXPLAY_DIR = PROJECT_ROOT / "uxplay-windows"
+OUTPUT_EXE = PROJECT_ROOT / "dist" / "MorppyMirror.exe"
+
+
+def validate_build_inputs():
+    if sys.platform != "win32":
+        raise RuntimeError("Build the Windows executable on Windows; PyInstaller cannot cross-compile.")
+    if sys.maxsize <= 2**32:
+        raise RuntimeError("Use 64-bit Python to build the Windows x64 package.")
+
+    required_files = {
+        "scrcpy": SCRCPY_DIR / "scrcpy.exe",
+        "ADB": SCRCPY_DIR / "adb.exe",
+        "QtScrcpy": QT_SCRCPY_DIR / "QtScrcpy.exe",
+        "UxPlay": UXPLAY_DIR / "uxplay.exe",
+    }
+    missing = [f"{name}: {path}" for name, path in required_files.items() if not path.is_file()]
+    if missing:
+        missing_list = "\n".join(f"  - {entry}" for entry in missing)
+        raise FileNotFoundError(
+            "The complete Windows tool distributions are required to bundle all app features:\n"
+            f"{missing_list}\n"
+            "Place the complete distributions in scrcpy-win64-v4.0, QtScrcpy, and "
+            "uxplay-windows beside this script."
+        )
+
 
 def build_standalone_exe():
-    print("==================================================")
-    print(" BUILDING MORPPY MOBILE MIRROR SUITE (PyInstaller)")
-    print("==================================================")
+    validate_build_inputs()
 
-    datas = []
-
-    # Include scrcpy-win64-v4.0 binaries & DLLs
-    if os.path.exists(SCRCPY_BIN_DIR):
-        print(f"Bundling Scrcpy 4.0 binaries from: {SCRCPY_BIN_DIR}")
-        datas.append((SCRCPY_BIN_DIR, "scrcpy-win64-v4.0"))
-
-    # Include uxplay-windows binaries & DLLs
-    if os.path.exists(UXPLAY_BIN_DIR):
-        print(f"Bundling UxPlay binaries from: {UXPLAY_BIN_DIR}")
-        datas.append((UXPLAY_BIN_DIR, "uxplay-windows"))
-
-    # Include assets directory
-    if os.path.exists(ASSETS_DIR):
-        print(f"Bundling assets from: {ASSETS_DIR}")
-        datas.append((ASSETS_DIR, "assets"))
-
-    # Include preset default file if present
-    presets_src = os.path.join(PROJECT_ROOT, "scrcpy_presets.json")
-    if os.path.exists(presets_src):
-        datas.append((presets_src, "."))
-
-    # Build PyInstaller command
-    pyinstaller_cmd = [
-        sys.executable, "-m", "PyInstaller",
-        "--noconsole",
-        "--onefile",
-        "--name=MorppyMirror",
-        "--clean"
+    spec_path = PROJECT_ROOT / "MorppyMirror.spec"
+    command = [
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--noconfirm",
+        "--clean",
+        "--distpath",
+        str(PROJECT_ROOT / "dist"),
+        "--workpath",
+        str(PROJECT_ROOT / "build" / "pyinstaller"),
+        str(spec_path),
     ]
 
-    # Add icon if exists
-    icon_path = os.path.join(ASSETS_DIR, "morppy.ico")
-    if os.path.exists(icon_path):
-        pyinstaller_cmd.append(f"--icon={icon_path}")
+    print("Building MorppyMirror as a single-file Windows application...")
+    print("The executable bundles Python, Python packages, Qt, and the vendor tool folders.")
+    result = subprocess.run(command, cwd=PROJECT_ROOT, check=False)
+    if result.returncode:
+        raise SystemExit(result.returncode)
 
-    # Add data mappings
-    for src, dst in datas:
-        pyinstaller_cmd.append(f"--add-data={src};{dst}")
+    if not OUTPUT_EXE.is_file():
+        raise FileNotFoundError(f"PyInstaller completed but did not create {OUTPUT_EXE}")
+    print(f"\nBuild successful: {OUTPUT_EXE}")
+    print("Distribute this single EXE; end users do not need Python or pip packages installed.")
 
-    # Hidden imports
-    hidden_imports = [
-        "PyQt5.QtCore",
-        "PyQt5.QtGui",
-        "PyQt5.QtWidgets",
-        "psutil",
-        "adbutils",
-        "config",
-        "android_engine",
-        "ios_engine"
-    ]
-    for imp in hidden_imports:
-        pyinstaller_cmd.append(f"--hidden-import={imp}")
-
-    # Target entry script
-    entry_script = os.path.join(PROJECT_ROOT, "morppy_app.py")
-    pyinstaller_cmd.append(entry_script)
-
-    print("\nRunning PyInstaller command...")
-    print(" ".join(pyinstaller_cmd))
-
-    res = subprocess.run(pyinstaller_cmd, cwd=PROJECT_ROOT)
-    if res.returncode == 0:
-        dist_exe = os.path.join(PROJECT_ROOT, "dist", "MorppyMirror.exe")
-        print("\n==================================================")
-        print(" BUILD SUCCESSFUL!")
-        print(f" Standalone Executable created at: {dist_exe}")
-        print("==================================================")
-    else:
-        print("\n[ERROR] PyInstaller build failed!")
-        sys.exit(1)
 
 if __name__ == "__main__":
-    build_standalone_exe()
+    try:
+        build_standalone_exe()
+    except (FileNotFoundError, RuntimeError) as error:
+        print(f"BUILD ERROR: {error}", file=sys.stderr)
+        raise SystemExit(1)
