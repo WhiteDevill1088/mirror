@@ -6,7 +6,7 @@ import queue
 import subprocess
 from datetime import datetime
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QSize, QEvent
 from PyQt5.QtGui import QIcon, QFont, QColor, QPalette, QCursor, QPixmap
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import (
 )
 
 from config import (
-    APP_NAME, APP_DATA_DIR, SETTINGS_FILE, PRESETS_FILE,
+    APP_NAME, APP_DATA_DIR, SETTINGS_FILE, THEME_SETTINGS_FILE, PRESETS_FILE,
     SESSION_HISTORY_FILE, SESSION_LOG_FILE, SCRCPY_EXECUTABLE,
     SCRCPY_DIRECTORY, QTSCRCPY_EXECUTABLE, UXPLAY_EXECUTABLE, UXPLAY_DIRECTORY
 )
@@ -170,6 +170,27 @@ QTextEdit {
 QScrollArea { border: none; background: transparent; }
 """
 
+THEME_CONCEPTS = {
+    "Cupertino Light": {
+        "description": "Quiet, airy surfaces with familiar system-blue accents.",
+        "swatches": ("#f5f7fb", "#ffffff", "#007aff"),
+        "light": ("#f2f4f8", "#ffffff", "#1c1c1e", "#6e7480", "#007aff", "#e7f1ff", "#dce8f6"),
+        "dark": ("#17191d", "#24262b", "#f5f5f7", "#a1a1aa", "#0a84ff", "#17304c", "#31343a"),
+    },
+    "Hybrid Studio": {
+        "description": "Cupertino clarity, balanced with Morppy’s glass details.",
+        "swatches": ("#111827", "#182230", "#38bdf8"),
+        "light": ("#f2f6fa", "#ffffff", "#172331", "#66788a", "#087fbe", "#e1f4fc", "#d8e6ee"),
+        "dark": ("#111827", "#182230", "#f8fafc", "#94a3b8", "#38bdf8", "#172a3a", "#263244"),
+    },
+    "Midnight Glass": {
+        "description": "A focused, low-glare workspace with a vivid violet signal.",
+        "swatches": ("#11111a", "#1d1b2b", "#a78bfa"),
+        "light": ("#f3f1f8", "#ffffff", "#211d30", "#777186", "#7655d9", "#eee8ff", "#ded8eb"),
+        "dark": ("#11111a", "#1d1b2b", "#f5f3ff", "#aaa5bb", "#a78bfa", "#2a2440", "#343144"),
+    },
+}
+
 
 # -----------------------------------------------------------------------------
 # SPLASH SCREEN BOOT ANIMATION
@@ -263,7 +284,7 @@ class DisplaySettingsDialog(QDialog):
         title = f"Configure & Launch Mirroring ({serial})" if serial else "Display & Stream Settings"
         self.setWindowTitle(title)
         self.setMinimumSize(620, 520)
-        self.setStyleSheet("""
+        self.setStyleSheet(main_win.adapt_dialog_stylesheet("""
             QDialog {
                 background-color: #12181b;
                 border: 2px solid #38bdf8;
@@ -311,7 +332,7 @@ class DisplaySettingsDialog(QDialog):
                 border-radius: 6px;
                 min-height: 32px;
             }
-        """)
+        """))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(26, 22, 26, 22)
@@ -465,7 +486,7 @@ class RecordingSettingsDialog(QDialog):
         title = f"Screen Recording Settings ({serial})" if serial else "Screen Recording Settings"
         self.setWindowTitle(title)
         self.setMinimumSize(640, 500)
-        self.setStyleSheet("""
+        self.setStyleSheet(main_win.adapt_dialog_stylesheet("""
             QDialog {
                 background-color: #12181b;
                 border: 2px solid #f97316;
@@ -513,7 +534,7 @@ class RecordingSettingsDialog(QDialog):
                 border-radius: 6px;
                 min-height: 32px;
             }
-        """)
+        """))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(28, 22, 28, 22)
@@ -713,6 +734,9 @@ class MorppyMainWindow(QMainWindow):
         self.ios_manager = IOSManager()
         self.session_history = self.load_session_history()
         self.presets = self.load_presets()
+        self.theme_concept, self.theme_polarity = self.load_theme_settings()
+        self.applied_theme_concept = self.theme_concept
+        self.applied_theme_polarity = self.theme_polarity
 
         # Persistent Display Settings state dictionary (prevents C++ Qt widget deletion bugs)
         self.display_settings = {
@@ -742,6 +766,13 @@ class MorppyMainWindow(QMainWindow):
 
         self.init_ui()
         self.init_system_tray()
+        if self.theme_settings_warning:
+            QTimer.singleShot(
+                0,
+                lambda: QMessageBox.warning(
+                    self, "Theme Settings", self.theme_settings_warning
+                )
+            )
 
         # Timers
         self.scan_timer = QTimer(self)
@@ -762,8 +793,19 @@ class MorppyMainWindow(QMainWindow):
         self.start_device_scan()
         self.log_message("Morppy Suite UI initialized.")
 
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if (
+            event.type() == QEvent.ApplicationPaletteChange
+            and hasattr(self, "applied_theme_polarity")
+            and self.applied_theme_polarity == "System"
+        ):
+            self.setStyleSheet(self.theme_application_stylesheet())
+            if hasattr(self, "theme_preview_frame"):
+                self.update_theme_studio_preview()
+
     def init_ui(self):
-        self.setStyleSheet(GLASS_DARK_QSS)
+        self.setStyleSheet(self.theme_application_stylesheet())
 
         central_widget = QWidget(self)
         self.setCentralWidget(central_widget)
@@ -820,7 +862,7 @@ class MorppyMainWindow(QMainWindow):
         self.nav_rail = QListWidget()
         self.nav_rail.setObjectName("navRail")
         self.nav_rail.setFixedWidth(190)
-        for label in ("Devices", "Global Settings", "Presets & History", "iOS AirPlay", "Logs"):
+        for label in ("Devices", "Global Settings", "Theme Studio", "Presets & History", "iOS AirPlay", "Logs"):
             item = QListWidgetItem(label)
             item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
             self.nav_rail.addItem(item)
@@ -834,6 +876,7 @@ class MorppyMainWindow(QMainWindow):
 
         self.build_devices_tab()
         self.build_global_settings_tab()
+        self.build_theme_studio_tab()
         self.build_presets_history_tab()
         self.build_ios_tab()
         self.build_logs_tab()
@@ -996,6 +1039,489 @@ class MorppyMainWindow(QMainWindow):
         layout.addStretch()
 
         self.content_pages.addWidget(tab)
+
+    # -------------------------------------------------------------------------
+    # THEME STUDIO CONCEPT GALLERY
+    # -------------------------------------------------------------------------
+    def build_theme_studio_tab(self):
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(16)
+
+        heading = QHBoxLayout()
+        title_block = QVBoxLayout()
+        title = QLabel("Theme Studio")
+        title.setStyleSheet("font-size: 23px; font-weight: 700;")
+        subtitle = QLabel("Preview a direction, then apply it across the app.")
+        subtitle.setStyleSheet("font-size: 13px;")
+        self.theme_studio_title = title
+        self.theme_studio_subtitle = subtitle
+        title_block.addWidget(title)
+        title_block.addWidget(subtitle)
+        heading.addLayout(title_block)
+        heading.addStretch()
+
+        mode_panel = QFrame()
+        self.theme_mode_panel = mode_panel
+        mode_layout = QHBoxLayout(mode_panel)
+        mode_layout.setContentsMargins(5, 5, 5, 5)
+        mode_layout.setSpacing(3)
+        self.theme_polarity_buttons = {}
+        for polarity, label in (
+            ("Light", "☀ Light"),
+            ("Dark", "◐ Dark"),
+            ("System", "⚙ System"),
+        ):
+            button = QPushButton(label)
+            button.setCheckable(True)
+            button.setCursor(QCursor(Qt.PointingHandCursor))
+            button.clicked.connect(
+                lambda checked=False, value=polarity: self.set_theme_studio_polarity(value)
+            )
+            mode_layout.addWidget(button)
+            self.theme_polarity_buttons[polarity] = button
+        heading.addWidget(mode_panel)
+        layout.addLayout(heading)
+
+        concept_heading = QHBoxLayout()
+        concept_title = QLabel("Choose a direction")
+        concept_title.setStyleSheet("font-size: 15px; font-weight: 700;")
+        self.theme_concept_heading = concept_title
+        concept_count = QLabel("3 CONCEPTS")
+        concept_count.setStyleSheet("font-size: 10px; font-weight: 700;")
+        self.theme_concept_count = concept_count
+        concept_heading.addWidget(concept_title)
+        concept_heading.addStretch()
+        concept_heading.addWidget(concept_count)
+        layout.addLayout(concept_heading)
+
+        self.theme_concept_cards = {}
+        self.theme_concept_buttons = {}
+        self.theme_concept_labels = {}
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(12)
+        for number, (name, concept) in enumerate(THEME_CONCEPTS.items(), start=1):
+            card = QFrame()
+            card.setObjectName("themeConceptCard")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(14, 14, 14, 14)
+            card_layout.setSpacing(8)
+
+            number_label = QLabel(f"CONCEPT {number}")
+            number_label.setStyleSheet("font-size: 10px; font-weight: 700;")
+            name_label = QLabel(name)
+            name_label.setStyleSheet("font-size: 15px; font-weight: 700;")
+            description_label = QLabel(concept["description"])
+            description_label.setWordWrap(True)
+            description_label.setMinimumHeight(36)
+            description_label.setStyleSheet("font-size: 11px;")
+
+            swatches = QHBoxLayout()
+            swatches.setSpacing(5)
+            for color in concept["swatches"]:
+                swatch = QFrame()
+                swatch.setFixedSize(18, 18)
+                swatch.setStyleSheet(
+                    f"background: {color}; border: 1px solid rgba(148,163,184,0.35); border-radius: 9px;"
+                )
+                swatches.addWidget(swatch)
+            swatches.addStretch()
+
+            select_button = QPushButton("Preview concept")
+            select_button.setCursor(QCursor(Qt.PointingHandCursor))
+            select_button.clicked.connect(
+                lambda checked=False, value=name: self.set_theme_studio_concept(value)
+            )
+            card_layout.addWidget(number_label)
+            card_layout.addWidget(name_label)
+            card_layout.addWidget(description_label)
+            card_layout.addLayout(swatches)
+            card_layout.addWidget(select_button)
+            cards_layout.addWidget(card, 1)
+            self.theme_concept_cards[name] = card
+            self.theme_concept_buttons[name] = select_button
+            self.theme_concept_labels[name] = (
+                number_label, name_label, description_label
+            )
+        layout.addLayout(cards_layout)
+
+        preview_header = QHBoxLayout()
+        preview_label = QLabel("LIVE PREVIEW")
+        preview_label.setStyleSheet("font-size: 10px; font-weight: 700;")
+        self.theme_preview_label = preview_label
+        self.theme_preview_mode = QLabel()
+        self.theme_preview_mode.setStyleSheet("font-size: 11px;")
+        preview_header.addWidget(preview_label)
+        preview_header.addStretch()
+        preview_header.addWidget(self.theme_preview_mode)
+        layout.addLayout(preview_header)
+
+        preview = QFrame()
+        preview.setObjectName("themePreviewFrame")
+        preview_layout = QHBoxLayout(preview)
+        preview_layout.setContentsMargins(24, 20, 24, 20)
+        preview_layout.setSpacing(20)
+
+        preview_copy = QVBoxLayout()
+        preview_copy.setSpacing(9)
+        eyebrow = QLabel("MORPPY  /  DEVICE WORKSPACE")
+        eyebrow.setObjectName("themePreviewEyebrow")
+        preview_title = QLabel("Your devices,\nin perfect balance.")
+        preview_title.setObjectName("themePreviewTitle")
+        preview_description = QLabel("A calmer home for every connection.")
+        preview_description.setObjectName("themePreviewDescription")
+        preview_status = QLabel("●  2 devices ready  ·  Last scan just now")
+        preview_status.setObjectName("themePreviewStatus")
+        action_row = QHBoxLayout()
+        primary_action = QPushButton("Connect device")
+        primary_action.setObjectName("themePreviewPrimary")
+        secondary_action = QPushButton("Open settings")
+        secondary_action.setObjectName("themePreviewSecondary")
+        action_row.addWidget(primary_action)
+        action_row.addWidget(secondary_action)
+        action_row.addStretch()
+        preview_copy.addWidget(eyebrow)
+        preview_copy.addWidget(preview_title)
+        preview_copy.addWidget(preview_description)
+        preview_copy.addSpacing(3)
+        preview_copy.addWidget(preview_status)
+        preview_copy.addSpacing(5)
+        preview_copy.addLayout(action_row)
+        preview_copy.addStretch()
+        preview_layout.addLayout(preview_copy, 1)
+
+        device_card = QFrame()
+        device_card.setObjectName("themePreviewDevice")
+        device_card.setMinimumWidth(210)
+        device_layout = QVBoxLayout(device_card)
+        device_layout.setContentsMargins(16, 14, 16, 14)
+        device_layout.setSpacing(10)
+        device_top = QHBoxLayout()
+        device_name = QLabel("Pixel 9")
+        device_name.setObjectName("themePreviewDeviceTitle")
+        device_state = QLabel("CONNECTED")
+        device_state.setObjectName("themePreviewBadge")
+        device_top.addWidget(device_name)
+        device_top.addStretch()
+        device_top.addWidget(device_state)
+        phone_screen = QFrame()
+        phone_screen.setObjectName("themePreviewPhone")
+        phone_screen.setMinimumHeight(74)
+        phone_screen_layout = QVBoxLayout(phone_screen)
+        phone_screen_layout.setContentsMargins(12, 9, 12, 9)
+        phone_label = QLabel("MIRROR SESSION")
+        phone_label.setStyleSheet("font-size: 9px; font-weight: 700; letter-spacing: 1px;")
+        phone_status = QLabel("1080p  ·  60 FPS")
+        phone_status.setStyleSheet("font-size: 12px; font-weight: 600;")
+        phone_screen_layout.addWidget(phone_label)
+        phone_screen_layout.addStretch()
+        phone_screen_layout.addWidget(phone_status)
+        device_footer = QLabel("Battery  92%")
+        device_footer.setObjectName("themePreviewDeviceFooter")
+        device_layout.addLayout(device_top)
+        device_layout.addWidget(phone_screen)
+        device_layout.addWidget(device_footer, alignment=Qt.AlignRight)
+        preview_layout.addWidget(device_card)
+        layout.addWidget(preview, 1)
+
+        theme_actions = QHBoxLayout()
+        self.theme_change_status = QLabel()
+        self.theme_change_status.setStyleSheet("font-size: 11px;")
+        self.theme_reset_button = QPushButton("Restore defaults")
+        self.theme_reset_button.clicked.connect(self.reset_theme_studio)
+        self.theme_apply_button = QPushButton("Apply theme")
+        self.theme_apply_button.setObjectName("applyThemeButton")
+        self.theme_apply_button.clicked.connect(self.apply_theme_studio)
+        theme_actions.addWidget(self.theme_change_status)
+        theme_actions.addStretch()
+        theme_actions.addWidget(self.theme_reset_button)
+        theme_actions.addWidget(self.theme_apply_button)
+        layout.addLayout(theme_actions)
+
+        self.theme_preview_frame = preview
+        self.content_pages.addWidget(tab)
+        self.update_theme_studio_preview()
+
+    def set_theme_studio_polarity(self, polarity):
+        if polarity == self.theme_polarity:
+            self.theme_polarity_buttons[polarity].setChecked(True)
+            return
+        self.theme_polarity = polarity
+        self.update_theme_studio_preview()
+
+    def set_theme_studio_concept(self, concept):
+        if concept == self.theme_concept:
+            return
+        self.theme_concept = concept
+        self.update_theme_studio_preview()
+
+    def reset_theme_studio(self):
+        self.theme_concept = "Hybrid Studio"
+        self.theme_polarity = "System"
+        self.update_theme_studio_preview()
+
+    def apply_theme_studio(self):
+        self.applied_theme_concept = self.theme_concept
+        self.applied_theme_polarity = self.theme_polarity
+        self.setStyleSheet(self.theme_application_stylesheet())
+        self.update_theme_studio_preview()
+        try:
+            with open(THEME_SETTINGS_FILE, "w", encoding="utf-8") as settings_file:
+                json.dump(
+                    {
+                        "concept": self.applied_theme_concept,
+                        "polarity": self.applied_theme_polarity,
+                    },
+                    settings_file,
+                    indent=2,
+                )
+        except OSError as exc:
+            QMessageBox.warning(
+                self,
+                "Theme Not Saved",
+                f"The theme was applied, but its preference could not be saved:\n{exc}",
+            )
+            return
+        self.log_message(
+            f"Applied theme: {self.applied_theme_concept} ({self.applied_theme_polarity})"
+        )
+
+    def load_theme_settings(self):
+        self.theme_settings_warning = ""
+        if not os.path.exists(THEME_SETTINGS_FILE):
+            return "Hybrid Studio", "System"
+        try:
+            with open(THEME_SETTINGS_FILE, "r", encoding="utf-8") as settings_file:
+                settings = json.load(settings_file)
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            self.theme_settings_warning = (
+                f"Saved theme preferences could not be read. The default theme will be used.\n{exc}"
+            )
+            return "Hybrid Studio", "System"
+
+        if not isinstance(settings, dict):
+            self.theme_settings_warning = (
+                "Saved theme preferences have an invalid format. The default theme will be used."
+            )
+            return "Hybrid Studio", "System"
+        concept = settings.get("concept", "Hybrid Studio")
+        polarity = settings.get("polarity", "System")
+        if (
+            not isinstance(concept, str)
+            or concept not in THEME_CONCEPTS
+            or not isinstance(polarity, str)
+            or polarity not in ("Light", "Dark", "System")
+        ):
+            self.theme_settings_warning = (
+                "Saved theme preferences contain an unsupported value. The default theme will be used."
+            )
+            return "Hybrid Studio", "System"
+        return concept, polarity
+
+    def theme_application_stylesheet(self):
+        concept = THEME_CONCEPTS[self.applied_theme_concept]
+        palette = self.active_theme_palette()
+        background, surface, foreground, muted, accent, soft_accent, border = palette
+        replacements = {
+            "#111827": background,
+            "#182230": surface,
+            "#0d1521": background,
+            "#263244": border,
+            "#334155": border,
+            "#475569": muted,
+            "#f8fafc": foreground,
+            "#e2e8f0": foreground,
+            "#cbd5e1": muted,
+            "#94a3b8": muted,
+            "#64748b": muted,
+            "#1e293b": surface,
+            "#16202d": background,
+            "#172a3a": soft_accent,
+            "#38bdf8": accent,
+        }
+        stylesheet = GLASS_DARK_QSS
+        for source, target in replacements.items():
+            stylesheet = stylesheet.replace(source, target)
+        return stylesheet
+
+    def active_theme_palette(self):
+        use_light = self.applied_theme_polarity == "Light"
+        if self.applied_theme_polarity == "System":
+            use_light = QApplication.palette().color(QPalette.Window).lightness() >= 128
+        return THEME_CONCEPTS[self.applied_theme_concept][
+            "light" if use_light else "dark"
+        ]
+
+    def adapt_dialog_stylesheet(self, stylesheet):
+        background, surface, foreground, muted, accent, soft_accent, border = (
+            self.active_theme_palette()
+        )
+        replacements = {
+            "#12181b": background,
+            "#0f172a": surface,
+            "#334155": border,
+            "#e2e8f0": foreground,
+            "#f8fafc": foreground,
+            "#38bdf8": accent,
+            "#0284c7": accent,
+            "rgba(26, 35, 39, 0.85)": surface,
+            "rgba(56, 189, 248, 0.35)": border,
+        }
+        for source, target in replacements.items():
+            stylesheet = stylesheet.replace(source, target)
+        return stylesheet
+
+    def update_theme_studio_preview(self):
+        if self.theme_polarity == "System":
+            is_light = QApplication.palette().color(QPalette.Window).lightness() >= 128
+            mode_label = f"System · {'Light' if is_light else 'Dark'} appearance"
+        else:
+            is_light = self.theme_polarity == "Light"
+            mode_label = f"{self.theme_polarity} appearance"
+        self.theme_preview_mode.setText(f"{self.theme_concept} · {mode_label}")
+
+        for polarity, button in self.theme_polarity_buttons.items():
+            button.setChecked(polarity == self.theme_polarity)
+
+        background, surface, foreground, muted, accent, soft_accent, border = (
+            THEME_CONCEPTS[self.theme_concept]["light" if is_light else "dark"]
+        )
+        self.theme_studio_title.setStyleSheet(
+            f"font-size: 23px; font-weight: 700; color: {foreground};"
+        )
+        self.theme_studio_subtitle.setStyleSheet(f"font-size: 13px; color: {muted};")
+        self.theme_mode_panel.setStyleSheet(
+            f"QFrame {{ background: {surface}; border: 1px solid {border}; border-radius: 10px; }}"
+        )
+        self.theme_concept_heading.setStyleSheet(
+            f"font-size: 15px; font-weight: 700; color: {foreground};"
+        )
+        self.theme_concept_count.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; color: {muted};"
+        )
+        self.theme_preview_label.setStyleSheet(
+            f"font-size: 10px; font-weight: 700; color: {muted};"
+        )
+        self.theme_preview_mode.setStyleSheet(f"font-size: 11px; color: {muted};")
+        self.theme_change_status.setStyleSheet(f"font-size: 11px; color: {muted};")
+        for polarity, button in self.theme_polarity_buttons.items():
+            if polarity == self.theme_polarity:
+                button.setStyleSheet(
+                    f"QPushButton {{ background: {accent}; color: #ffffff; border: none; "
+                    "border-radius: 7px; padding: 7px 10px; font-weight: 700; }"
+                )
+            else:
+                button.setStyleSheet(
+                    f"QPushButton {{ background: transparent; color: {foreground}; border: none; "
+                    "border-radius: 7px; padding: 7px 10px; }"
+                    f"QPushButton:hover {{ background: {soft_accent}; }}"
+                )
+
+        self.theme_preview_frame.setStyleSheet(f"""
+            QFrame#themePreviewFrame {{
+                background: {background};
+                border: 1px solid {border};
+                border-radius: 16px;
+            }}
+            QLabel#themePreviewEyebrow {{
+                color: {muted};
+                font-size: 10px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            }}
+            QLabel#themePreviewTitle {{
+                color: {foreground};
+                font-size: 24px;
+                font-weight: 700;
+            }}
+            QLabel#themePreviewDescription, QLabel#themePreviewDeviceFooter {{
+                color: {muted};
+                font-size: 11px;
+            }}
+            QLabel#themePreviewStatus {{
+                color: {muted};
+                font-size: 11px;
+            }}
+            QFrame#themePreviewDevice {{
+                background: {surface};
+                border: 1px solid {border};
+                border-radius: 12px;
+            }}
+            QLabel#themePreviewDeviceTitle {{
+                color: {foreground};
+                font-size: 13px;
+                font-weight: 700;
+            }}
+            QLabel#themePreviewBadge {{
+                background: {soft_accent};
+                color: {accent};
+                border-radius: 7px;
+                padding: 4px 7px;
+                font-size: 9px;
+                font-weight: 700;
+            }}
+            QFrame#themePreviewPhone {{
+                background: {background};
+                border: 1px solid {border};
+                border-radius: 8px;
+            }}
+            QFrame#themePreviewPhone QLabel {{
+                color: {muted};
+                border: none;
+            }}
+            QPushButton#themePreviewPrimary {{
+                background: {accent};
+                color: #ffffff;
+                border: none;
+                border-radius: 7px;
+                padding: 7px 11px;
+                font-size: 11px;
+                font-weight: 700;
+            }}
+            QPushButton#themePreviewSecondary {{
+                background: {surface};
+                color: {foreground};
+                border: 1px solid {border};
+                border-radius: 7px;
+                padding: 7px 11px;
+                font-size: 11px;
+            }}
+        """)
+        for name, card in self.theme_concept_cards.items():
+            selected = name == self.theme_concept
+            card.setStyleSheet(
+                f"QFrame#themeConceptCard {{ background: {surface}; border: 1px solid "
+                f"{accent if selected else border}; border-radius: 12px; }}"
+            )
+            number_label, name_label, description_label = self.theme_concept_labels[name]
+            number_label.setStyleSheet(f"font-size: 10px; font-weight: 700; color: {muted};")
+            name_label.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {foreground};")
+            description_label.setStyleSheet(f"font-size: 11px; color: {muted};")
+            select_button = self.theme_concept_buttons[name]
+            select_button.setText("Previewing" if selected else "Preview concept")
+            select_button.setStyleSheet(
+                f"QPushButton {{ background: {soft_accent if selected else surface}; "
+                f"color: {accent if selected else foreground}; border: 1px solid "
+                f"{accent if selected else border}; border-radius: 7px; padding: 6px 9px; "
+                "font-size: 11px; font-weight: 600; }"
+            )
+
+        has_pending_changes = (
+            self.theme_concept != self.applied_theme_concept
+            or self.theme_polarity != self.applied_theme_polarity
+        )
+        self.theme_change_status.setText(
+            "Preview only — apply to update the app."
+            if has_pending_changes
+            else "Current app theme"
+        )
+        self.theme_apply_button.setEnabled(has_pending_changes)
+        self.theme_apply_button.setStyleSheet(
+            f"QPushButton#applyThemeButton {{ background: {accent}; color: #ffffff; "
+            "border: none; border-radius: 8px; padding: 8px 14px; font-weight: 700; }"
+            f"QPushButton#applyThemeButton:disabled {{ background: {border}; color: {muted}; }}"
+        )
 
     # -------------------------------------------------------------------------
     # TAB 4: PRESETS & HISTORY

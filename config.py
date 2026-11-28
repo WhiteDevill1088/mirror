@@ -70,6 +70,7 @@ if not os.path.exists(UXPLAY_EXECUTABLE):
 
 # --- DATA FILES ---
 SETTINGS_FILE = os.path.join(APP_DATA_DIR, "scrcpy_settings.json")
+THEME_SETTINGS_FILE = os.path.join(APP_DATA_DIR, "ui_theme_settings.json")
 PRESETS_FILE = os.path.join(APP_DATA_DIR, "scrcpy_presets.json")
 SESSION_LOG_FILE = os.path.join(APP_DATA_DIR, "scrcpy_session_log.txt")
 SESSION_HISTORY_FILE = os.path.join(APP_DATA_DIR, "scrcpy_session_history.json")
