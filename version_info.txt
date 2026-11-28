@@ -14,11 +14,11 @@ VSVersionInfo(
       StringTable(
         '040904B0',
         [StringStruct('CompanyName', 'Morppy'),
-         StringStruct('FileDescription', 'Morppy Setup Wizard'),
+         StringStruct('FileDescription', 'Morppy Mobile Mirror Suite'),
          StringStruct('FileVersion', '1.0.0'),
-         StringStruct('InternalName', 'MorppySetup'),
+         StringStruct('InternalName', 'MorppyMirror'),
          StringStruct('LegalCopyright', 'Copyright © Morppy'),
-         StringStruct('OriginalFilename', 'MorppySetup.exe'),
+         StringStruct('OriginalFilename', 'MorppyMirror.exe'),
          StringStruct('ProductName', 'Morppy'),
          StringStruct('ProductVersion', '1.0.0')])
     ]),
