@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import (
     QGroupBox, QTableWidget, QTableWidgetItem, QHeaderView, QTextEdit,
     QSpinBox, QSystemTrayIcon, QMenu, QAction, QFileDialog, QMessageBox,
     QFrame, QGridLayout, QFormLayout, QScrollArea, QProgressBar, QSplashScreen, QInputDialog,
-    QDialog, QStackedWidget, QListWidget, QListWidgetItem
+    QDialog, QStackedWidget, QListWidget, QListWidgetItem, QToolButton
 )
 
 from config import (
@@ -36,6 +36,9 @@ QMainWindow, QDialog, QWidget {
     font-family: 'Segoe UI', Arial, sans-serif;
     font-size: 13px;
 }
+QLabel {
+    background-color: transparent;
+}
 QFrame#headerFrame {
     background-color: #111827;
     border-bottom: 1px solid #263244;
@@ -43,14 +46,21 @@ QFrame#headerFrame {
 QFrame#cardFrame {
     background-color: #182230;
     border: 1px solid #263244;
-    border-radius: 12px;
+    border-radius: 10px;
 }
-QFrame#toolbarFrame {
-    background-color: #111827;
+QFrame#deviceConnectFrame {
+    background-color: #182230;
     border: 1px solid #263244;
-    border-radius: 8px;
+    border-radius: 10px;
 }
-
+QLabel#deviceConnectionBadge {
+    background-color: #172a3a;
+    color: #38bdf8;
+    border-radius: 8px;
+    padding: 4px 7px;
+    font-size: 10px;
+    font-weight: 700;
+}
 QListWidget#navRail {
     background-color: #0d1521;
     border: none;
@@ -118,6 +128,30 @@ QPushButton#toolBtn {
     font-size: 12px;
 }
 QPushButton#toolBtn:hover { color: #38bdf8; border-color: #38bdf8; }
+QToolButton#toolBtn {
+    background-color: #182230;
+    color: #cbd5e1;
+    border: 1px solid #263244;
+    border-radius: 6px;
+    padding: 6px 10px;
+    min-height: 20px;
+    font-size: 12px;
+}
+QToolButton#toolBtn:hover { color: #38bdf8; border-color: #38bdf8; }
+QMenu {
+    background-color: #182230;
+    color: #f8fafc;
+    border: 1px solid #263244;
+    padding: 5px;
+}
+QMenu::item {
+    padding: 6px 24px 6px 10px;
+    border-radius: 4px;
+}
+QMenu::item:selected {
+    background-color: #172a3a;
+    color: #38bdf8;
+}
 
 QLineEdit, QComboBox, QSpinBox {
     background-color: #111827;
@@ -748,9 +782,8 @@ class MorppyMainWindow(QMainWindow):
             "crop": ""
         }
 
-        # Recording sessions tracking state & blinking animation state
+        # Recording session state
         self.recording_sessions = {}
-        self.rec_blink_state = False
 
         # GPU-based Auto-Detection of Recommended Recording Engine
         recommended_rec_engine = detect_recommended_recording_engine()
@@ -784,11 +817,6 @@ class MorppyMainWindow(QMainWindow):
         self.telemetry_timer.setInterval(1000)
         self.telemetry_timer.timeout.connect(self.update_telemetry)
         self.telemetry_timer.start()
-
-        self.rec_blink_timer = QTimer(self)
-        self.rec_blink_timer.setInterval(500)
-        self.rec_blink_timer.timeout.connect(self.animate_recording_blink)
-        self.rec_blink_timer.start()
 
         self.start_device_scan()
         self.log_message("Morppy Suite UI initialized.")
@@ -887,30 +915,55 @@ class MorppyMainWindow(QMainWindow):
     def build_devices_tab(self):
         tab = QWidget()
         layout = QVBoxLayout(tab)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(24, 22, 24, 22)
+        layout.setSpacing(14)
 
-        connect_box = QGroupBox("Wireless ADB Connection")
+        heading = QHBoxLayout()
+        title_block = QVBoxLayout()
+        title_block.setSpacing(3)
+        title = QLabel("Devices")
+        title.setStyleSheet("font-size: 23px; font-weight: 700;")
+        subtitle = QLabel("Connect, mirror, and manage your Android devices.")
+        subtitle.setStyleSheet("font-size: 12px;")
+        title_block.addWidget(title)
+        title_block.addWidget(subtitle)
+        heading.addLayout(title_block)
+        heading.addStretch()
+        layout.addLayout(heading)
+
+        connect_box = QFrame()
+        connect_box.setObjectName("deviceConnectFrame")
         connect_layout = QHBoxLayout(connect_box)
+        connect_layout.setContentsMargins(14, 11, 14, 11)
+        connect_layout.setSpacing(10)
 
-        connect_layout.addWidget(QLabel("IP Address & Port:"))
+        connect_label = QLabel("Wireless")
+        connect_label.setStyleSheet("font-size: 12px; font-weight: 700;")
+        connect_layout.addWidget(connect_label)
         self.ip_input = QLineEdit()
-        self.ip_input.setPlaceholderText("e.g. 192.168.1.35:5555")
+        self.ip_input.setPlaceholderText("Device IP address and port")
+        self.ip_input.setClearButtonEnabled(True)
+        self.ip_input.returnPressed.connect(self.connect_wireless_ip)
         connect_layout.addWidget(self.ip_input, 1)
 
-        btn_connect_ip = QPushButton("🔌 Connect Wireless")
+        btn_connect_ip = QPushButton("Connect")
+        btn_connect_ip.setObjectName("successBtn")
         btn_connect_ip.setCursor(QCursor(Qt.PointingHandCursor))
         btn_connect_ip.clicked.connect(self.connect_wireless_ip)
         connect_layout.addWidget(btn_connect_ip)
-
         layout.addWidget(connect_box)
 
         search_layout = QHBoxLayout()
+        search_layout.setSpacing(10)
         self.device_search = QLineEdit()
-        self.device_search.setPlaceholderText("Search by model or serial")
+        self.device_search.setPlaceholderText("Filter devices by name or serial")
+        self.device_search.setClearButtonEnabled(True)
         self.device_search.textChanged.connect(self.render_device_cards)
-        search_layout.addWidget(self.device_search)
-        search_layout.addStretch()
+        search_layout.addWidget(self.device_search, 1)
+        self.device_filter_count = QLabel("0 devices")
+        self.device_filter_count.setStyleSheet("font-size: 11px;")
+        self.device_filter_count.hide()
+        search_layout.addWidget(self.device_filter_count)
         layout.addLayout(search_layout)
 
         scroll_area = QScrollArea()
@@ -920,7 +973,7 @@ class MorppyMainWindow(QMainWindow):
         self.devices_container = QWidget()
         self.devices_layout = QVBoxLayout(self.devices_container)
         self.devices_layout.setContentsMargins(0, 0, 0, 0)
-        self.devices_layout.setSpacing(12)
+        self.devices_layout.setSpacing(8)
         self.devices_layout.addStretch()
 
         scroll_area.setWidget(self.devices_container)
@@ -1677,9 +1730,12 @@ class MorppyMainWindow(QMainWindow):
                 child.widget().deleteLater()
 
         if not self.known_devices:
-            lbl_empty = QLabel("No Android devices found\nConnect a device by USB or enter a wireless address above.")
+            self.device_filter_count.hide()
+            lbl_empty = QLabel(
+                "No Android devices connected\nConnect by USB or use wireless ADB above."
+            )
             lbl_empty.setAlignment(Qt.AlignCenter)
-            lbl_empty.setStyleSheet("color: #64748b; font-size: 14px; padding: 40px;")
+            lbl_empty.setStyleSheet("font-size: 13px; padding: 48px;")
             self.devices_layout.insertWidget(0, lbl_empty)
             return
 
@@ -1691,10 +1747,14 @@ class MorppyMainWindow(QMainWindow):
                 continue
             visible_devices.append((serial, info))
 
+        total = len(self.known_devices)
+        self.device_filter_count.setText(f"{len(visible_devices)} of {total}")
+        self.device_filter_count.setVisible(bool(query))
+
         if not visible_devices:
-            lbl_empty = QLabel("No devices match your search.")
+            lbl_empty = QLabel("No devices match this filter.")
             lbl_empty.setAlignment(Qt.AlignCenter)
-            lbl_empty.setStyleSheet("color: #64748b; font-size: 14px; padding: 40px;")
+            lbl_empty.setStyleSheet("font-size: 13px; padding: 48px;")
             self.devices_layout.insertWidget(0, lbl_empty)
             return
 
@@ -1702,22 +1762,20 @@ class MorppyMainWindow(QMainWindow):
             card = QFrame()
             card.setObjectName("cardFrame")
             card_layout = QVBoxLayout(card)
-            card_layout.setSpacing(12)
+            card_layout.setContentsMargins(16, 13, 16, 13)
+            card_layout.setSpacing(9)
 
-            # Top row: Serial & Model + Battery
             top_row = QHBoxLayout()
+            top_row.setSpacing(10)
             lbl_title = QLabel(info["model"])
             lbl_title.setFont(QFont("Segoe UI", 13, QFont.Bold))
-            lbl_title.setStyleSheet("color: #38bdf8;")
-
             lbl_serial = QLabel(serial)
-            lbl_serial.setStyleSheet("color: #94a3b8;")
-
-            lbl_connection = QLabel("USB" if ":" not in serial else "Wireless")
-            lbl_connection.setStyleSheet("color: #34d399; border: 1px solid rgba(16,185,129,.35); border-radius: 10px; padding: 4px 8px;")
-
-            lbl_battery = QLabel(info["battery"])
-            lbl_battery.setStyleSheet("color: #34d399; font-weight: bold;")
+            lbl_serial.setStyleSheet("font-size: 11px;")
+            lbl_connection = QLabel("WIRELESS" if ":" in serial else "USB")
+            lbl_connection.setObjectName("deviceConnectionBadge")
+            battery = info.get("battery", "Battery —")
+            lbl_battery = QLabel(battery)
+            lbl_battery.setStyleSheet("font-size: 11px; font-weight: 600;")
 
             top_row.addWidget(lbl_title)
             top_row.addWidget(lbl_serial)
@@ -1726,121 +1784,106 @@ class MorppyMainWindow(QMainWindow):
             top_row.addWidget(lbl_battery)
             card_layout.addLayout(top_row)
 
-            # Live Telemetry Stats Row
-            telemetry_row = QHBoxLayout()
-            lbl_cpu = QLabel("CPU: --")
+            detail_row = QHBoxLayout()
+            detail_row.setSpacing(14)
+            lbl_cpu = QLabel("CPU  —")
             lbl_cpu.setObjectName(f"cpu_{serial}")
-            lbl_ram = QLabel("RAM: --")
+            lbl_ram = QLabel("Memory  —")
             lbl_ram.setObjectName(f"ram_{serial}")
-
-            telemetry_row.addWidget(lbl_cpu)
-            telemetry_row.addWidget(lbl_ram)
-            telemetry_row.addStretch()
-            card_layout.addLayout(telemetry_row)
-
-            # Primary Session Actions Row
-            btn_row = QHBoxLayout()
-
-            btn_mirror = QPushButton("Launch Mirror")
-            btn_mirror.setObjectName("successBtn")
-            btn_mirror.clicked.connect(lambda _, s=serial: self.launch_mirror_session(s))
-
-            btn_reset_res = QPushButton("Reset Screen")
-            btn_reset_res.setToolTip("Resets phone screen resolution & density to default native mode.")
-            btn_reset_res.clicked.connect(lambda _, s=serial: (AndroidManager.reset_hardware_resolution(s), self.log_message(f"Reset resolution for {s}.")))
-
-            btn_screen_off = QPushButton("Screen Off")
-            btn_screen_off.setToolTip("Turns OFF physical phone display while keeping PC mirror stream 100% active to save battery & protect screen.")
-            btn_screen_off.clicked.connect(lambda _, s=serial: (AndroidManager.turn_off_screen(s), self.log_message(f"Turned OFF physical display for {s}.")))
-
-            btn_lock = QPushButton("Lock")
-            btn_lock.clicked.connect(lambda _, s=serial: AndroidManager.lock_device(s))
-
-            btn_reboot = QPushButton("Reboot")
-            btn_reboot.setObjectName("dangerBtn")
-            btn_reboot.clicked.connect(lambda _, s=serial: self.confirm_reboot(s))
+            for label in (lbl_cpu, lbl_ram):
+                label.setStyleSheet("font-size: 11px;")
+                detail_row.addWidget(label)
+            detail_row.addStretch()
 
             is_rec = self.recording_sessions.get(serial, False)
-            btn_rec = QPushButton("Recording" if is_rec else "Start Recording")
+            btn_rec = QPushButton("Stop recording" if is_rec else "Record")
             btn_rec.setObjectName(f"rec_btn_{serial}")
-            if is_rec:
-                btn_rec.setStyleSheet("""
-                    QPushButton {
-                        background-color: rgba(249, 115, 22, 0.35);
-                        color: #ffedd5;
-                        border: 1px solid #f97316;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover {
-                        background-color: rgba(249, 115, 22, 0.5);
-                        border-color: #fb923c;
-                    }
-                """)
-            else:
-                btn_rec.setToolTip("Start screen recording on this device.")
-
+            btn_rec.setCursor(QCursor(Qt.PointingHandCursor))
             btn_rec.clicked.connect(lambda _, s=serial: self.toggle_recording_session(s))
 
-            btn_row.addWidget(btn_mirror)
-            btn_row.addWidget(btn_reset_res)
-            btn_row.addWidget(btn_screen_off)
-            btn_row.addWidget(btn_lock)
-            btn_row.addWidget(btn_reboot)
-            btn_row.addWidget(btn_rec)
+            btn_mirror = QPushButton("Launch mirror")
+            btn_mirror.setObjectName("successBtn")
+            btn_mirror.setCursor(QCursor(Qt.PointingHandCursor))
+            btn_mirror.clicked.connect(lambda _, s=serial: self.launch_mirror_session(s))
 
-            card_layout.addLayout(btn_row)
+            btn_settings = QPushButton("Settings")
+            btn_settings.setObjectName("toolBtn")
+            btn_settings.setCursor(QCursor(Qt.PointingHandCursor))
+            btn_settings.clicked.connect(
+                lambda _, s=serial: self.open_display_settings_dialog(s)
+            )
 
-            # Screen Control Quick Toolbar
-            toolbar_box = QFrame()
-            toolbar_box.setObjectName("toolbarFrame")
-            tb_layout = QHBoxLayout(toolbar_box)
-            tb_layout.setContentsMargins(6, 4, 6, 4)
-            tb_layout.setSpacing(6)
+            more_button = QToolButton()
+            more_button.setText("More")
+            more_button.setPopupMode(QToolButton.InstantPopup)
+            more_button.setCursor(QCursor(Qt.PointingHandCursor))
+            more_button.setObjectName("toolBtn")
+            more_menu = QMenu(more_button)
+            more_menu.addSection("Device")
+            more_menu.addAction(
+                "Reset screen resolution",
+                lambda checked=False, s=serial: (
+                    AndroidManager.reset_hardware_resolution(s),
+                    self.log_message(f"Reset resolution for {s}."),
+                ),
+            )
+            more_menu.addAction(
+                "Turn screen off",
+                lambda checked=False, s=serial: (
+                    AndroidManager.turn_off_screen(s),
+                    self.log_message(f"Turned off physical display for {s}."),
+                ),
+            )
+            more_menu.addAction(
+                "Lock device", lambda checked=False, s=serial: AndroidManager.lock_device(s)
+            )
+            more_menu.addAction(
+                "Reboot device", lambda checked=False, s=serial: self.confirm_reboot(s)
+            )
+            more_menu.addSection("Controls")
+            controls_menu = more_menu.addMenu("Navigation & volume")
+            for label, key_code in (
+                ("Power", 26),
+                ("Volume up", 24),
+                ("Volume down", 25),
+                ("Back", 4),
+                ("Home", 3),
+                ("Recents", 187),
+            ):
+                controls_menu.addAction(
+                    label, lambda checked=False, s=serial, code=key_code:
+                    AndroidManager.send_keyevent(s, code)
+                )
+            more_menu.addSeparator()
+            more_menu.addAction(
+                "Send text to device",
+                lambda checked=False, s=serial: self.prompt_inject_text(s),
+            )
+            more_menu.addAction(
+                "Take screenshot",
+                lambda checked=False, s=serial: AndroidManager.take_screenshot(
+                    s, self.recording_settings.get("path", SCRCPY_DIRECTORY)
+                ),
+            )
+            more_button.setMenu(more_menu)
 
-            btn_pow = QPushButton("Power")
-            btn_pow.setObjectName("toolBtn")
-            btn_pow.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 26))
-
-            btn_volp = QPushButton("Vol+")
-            btn_volp.setObjectName("toolBtn")
-            btn_volp.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 24))
-
-            btn_volm = QPushButton("Vol-")
-            btn_volm.setObjectName("toolBtn")
-            btn_volm.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 25))
-
-            btn_back = QPushButton("Back")
-            btn_back.setObjectName("toolBtn")
-            btn_back.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 4))
-
-            btn_home = QPushButton("Home")
-            btn_home.setObjectName("toolBtn")
-            btn_home.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 3))
-
-            btn_recents = QPushButton("Recents")
-            btn_recents.setObjectName("toolBtn")
-            btn_recents.clicked.connect(lambda _, s=serial: AndroidManager.send_keyevent(s, 187))
-
-            btn_clip = QPushButton("Clipboard")
-            btn_clip.setObjectName("toolBtn")
-            btn_clip.clicked.connect(lambda _, s=serial: self.prompt_inject_text(s))
-
-            btn_snap = QPushButton("Screenshot")
-            btn_snap.setObjectName("toolBtn")
-            btn_snap.clicked.connect(lambda _, s=serial: AndroidManager.take_screenshot(
-                s, self.recording_settings.get("path", SCRCPY_DIRECTORY)
-            ))
-
-            tb_layout.addWidget(btn_pow)
-            tb_layout.addWidget(btn_volp)
-            tb_layout.addWidget(btn_volm)
-            tb_layout.addWidget(btn_back)
-            tb_layout.addWidget(btn_home)
-            tb_layout.addWidget(btn_recents)
-            tb_layout.addWidget(btn_clip)
-            tb_layout.addWidget(btn_snap)
-
-            card_layout.addWidget(toolbar_box)
+            action_row = QHBoxLayout()
+            action_row.setSpacing(7)
+            btn_mirror.setStyleSheet(
+                "QPushButton { padding: 6px 12px; min-height: 18px; font-size: 12px; }"
+            )
+            btn_rec.setStyleSheet(
+                "QPushButton { "
+                f"{'background: #7f1d1d; color: #ffffff; border: 1px solid #ef4444;' if is_rec else ''} "
+                "padding: 6px 12px; min-height: 18px; font-size: 12px; }"
+            )
+            action_row.addWidget(btn_mirror)
+            action_row.addWidget(btn_rec)
+            action_row.addWidget(btn_settings)
+            action_row.addWidget(more_button)
+            action_row.addStretch()
+            card_layout.addLayout(detail_row)
+            card_layout.addLayout(action_row)
 
             self.devices_layout.insertWidget(self.devices_layout.count() - 1, card)
 
@@ -1893,19 +1936,8 @@ class MorppyMainWindow(QMainWindow):
         cpu_lbl = self.findChild(QLabel, f"cpu_{serial}")
         ram_lbl = self.findChild(QLabel, f"ram_{serial}")
 
-        if cpu_lbl: cpu_lbl.setText(f"CPU: {telemetry.get('cpu', '--')}")
-        if ram_lbl: ram_lbl.setText(f"RAM: {telemetry.get('ram', '--')}")
-
-    def animate_recording_blink(self):
-        self.rec_blink_state = not self.rec_blink_state
-        for serial, is_rec in list(self.recording_sessions.items()):
-            if is_rec:
-                btn = self.findChild(QPushButton, f"rec_btn_{serial}")
-                if btn:
-                    try:
-                        btn.setText("Recording" if self.rec_blink_state else "Recording...")
-                    except RuntimeError:
-                        pass
+        if cpu_lbl: cpu_lbl.setText(f"CPU  {telemetry.get('cpu', '--')}")
+        if ram_lbl: ram_lbl.setText(f"Memory  {telemetry.get('ram', '--')}")
 
     def toggle_recording_session(self, serial, btn=None):
         live_btn = self.findChild(QPushButton, f"rec_btn_{serial}") or btn
@@ -1924,19 +1956,12 @@ class MorppyMainWindow(QMainWindow):
                 self.recording_sessions[serial] = True
                 if live_btn:
                     try:
-                        live_btn.setStyleSheet("""
-                            QPushButton {
-                                background-color: rgba(249, 115, 22, 0.35);
-                                color: #ffedd5;
-                                border: 1px solid #f97316;
-                                font-weight: bold;
-                            }
-                            QPushButton:hover {
-                                background-color: rgba(249, 115, 22, 0.5);
-                                border-color: #fb923c;
-                            }
-                        """)
-                        live_btn.setText("Recording")
+                        live_btn.setStyleSheet(
+                            "QPushButton { background: #7f1d1d; color: #ffffff; "
+                            "border: 1px solid #ef4444; padding: 6px 12px; "
+                            "min-height: 18px; font-size: 12px; }"
+                        )
+                        live_btn.setText("Stop recording")
                     except RuntimeError:
                         pass
                 self.log_message(f"Started screen recording on {serial} ({fmt.upper()}). Target path: {res}")
@@ -1955,19 +1980,10 @@ class MorppyMainWindow(QMainWindow):
             self.recording_sessions[serial] = False
             if live_btn:
                 try:
-                    live_btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: rgba(239, 68, 68, 0.2);
-                            color: #fca5a5;
-                            border: 1px solid #ef4444;
-                            font-weight: bold;
-                        }
-                        QPushButton:hover {
-                            background-color: rgba(239, 68, 68, 0.35);
-                            border-color: #f87171;
-                        }
-                    """)
-                    live_btn.setText("Start Recording")
+                    live_btn.setStyleSheet(
+                        "QPushButton { padding: 6px 12px; min-height: 18px; font-size: 12px; }"
+                    )
+                    live_btn.setText("Record")
                 except RuntimeError:
                     pass
             save_dir = self.recording_settings.get("path", SCRCPY_DIRECTORY)
